@@ -1,6 +1,6 @@
 import base64
 import io
-from typing import Tuple
+from typing import Optional, Tuple
 
 from fastapi import UploadFile
 from PIL import Image
@@ -18,7 +18,7 @@ ALLOWED_IMAGE_TYPES = {
 }
 
 
-def validate_image_upload(image_bytes: bytes, content_type: str | None) -> None:
+def validate_image_upload(image_bytes: bytes, content_type: Optional[str]) -> None:
     if not image_bytes:
         raise ValidationError("Image file is empty")
     if content_type not in ALLOWED_IMAGE_TYPES:

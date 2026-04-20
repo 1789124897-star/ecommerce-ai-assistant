@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import DateTime, Enum, Integer, JSON, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -24,7 +24,7 @@ class TaskRecord(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     task_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     task_type: Mapped[str] = mapped_column(String(32), index=True)
-    product_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    product_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[TaskStatus] = mapped_column(
         Enum(TaskStatus),
         default=TaskStatus.PENDING,
@@ -32,17 +32,17 @@ class TaskRecord(Base):
     )
     submitted_by: Mapped[str] = mapped_column(String(64), default="system")
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
-    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    request_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    result_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    request_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    result_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
     )
-    updated_at: Mapped[datetime | None] = mapped_column(
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
