@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import List
+from typing import List, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,11 +53,11 @@ class Settings(BaseSettings):
     )
 
     @property
-    def docs_url(self) -> str | None:
+    def docs_url(self) -> Optional[str]:
         return "/docs" if self.ENABLE_DOCS else None
 
     @property
-    def redoc_url(self) -> str | None:
+    def redoc_url(self) -> Optional[str]:
         return "/redoc" if self.ENABLE_DOCS else None
 
     @property

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ class TaskRepository:
         *,
         task_id: str,
         task_type: str,
-        product_name: str | None,
+        product_name: Optional[str],
         request_payload: dict[str, Any],
         submitted_by: str,
     ) -> TaskRecord:
@@ -33,7 +33,7 @@ class TaskRepository:
         await self.db.refresh(task)
         return task
 
-    async def get_by_task_id(self, task_id: str) -> TaskRecord | None:
+    async def get_by_task_id(self, task_id: str) -> Optional[TaskRecord]:
         result = await self.db.execute(
             select(TaskRecord).where(TaskRecord.task_id == task_id)
         )
