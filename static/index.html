@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>电商AI操盘手 - 图文分析 + AI生成真实主图/详情图</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+            background: #f1f5f9;
+            padding: 24px 16px;
+            color: #0f172a;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 20px 35px -12px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+        .hero {
+            background: linear-gradient(115deg, #1E2A5E 0%, #556B9D 100%);
+            padding: 1.8rem 2rem;
+            color: white;
+        }
+        .hero h1 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .hero h1:before {
+            content: "🧠";
+            font-size: 2rem;
+        }
+        .hero p {
+            margin-top: 8px;
+            opacity: 0.85;
+            font-size: 0.95rem;
+        }
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+        }
+        .input-panel {
+            width: 100%;
+            background: #ffffff;
+            padding: 1.8rem 2rem;
+            border-bottom: 1px solid #e9eef3;
+        }
+        .output-panel {
+            width: 100%;
+            background: #fefefe;
+            padding: 1.8rem 2rem;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.2rem;
+            margin-bottom: 1.2rem;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        label {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            color: #1e293b;
+            font-size: 0.85rem;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            background: #fafcff;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+            background: white;
+        }
+        .file-zone {
+            border: 1.5px dashed #cbd5e1;
+            border-radius: 20px;
+            padding: 8px;
+            background: #f8fafc;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .file-zone:hover {
+            background: #f1f5f9;
+            border-color: #4f46e5;
+        }
+        .image-preview {
+            max-width: 100%;
+            max-height: 160px;
+            margin-top: 12px;
+            border-radius: 16px;
+            display: none;
+            object-fit: contain;
+            background: #f1f5f9;
+        }
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            margin-top: 12px;
+            padding: 12px 18px;
+            border-radius: 40px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: 0.2s;
+            width: 100%;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        button:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(79, 70, 229, 0.25);
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+            font-weight: 500;
+            color: #4f46e5;
+            background: #eef2ff;
+            padding: 12px;
+            border-radius: 40px;
+        }
+        .analysis-card {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 1.4rem 1.6rem;
+            margin-bottom: 1.8rem;
+            border: 1px solid #eef2ff;
+            box-shadow: 0 6px 12px -6px rgba(0, 0, 0, 0.05);
+        }
+        .analysis-card h2 {
+            font-size: 1.35rem;
+            margin-bottom: 1rem;
+            border-left: 5px solid #4f46e5;
+            padding-left: 16px;
+        }
+        .markdown-body {
+            line-height: 1.65;
+            color: #1e293b;
+        }
+        .markdown-body ul, .markdown-body ol {
+            padding-left: 1.5rem;
+            margin: 0.8rem 0;
+        }
+        .task-id {
+            font-size: 0.7rem;
+            color: #6c757d;
+            margin-top: 1rem;
+            border-top: 1px dashed #e2e8f0;
+            padding-top: 0.8rem;
+            text-align: right;
+        }
+        .strategy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 1rem 0 1rem 0;
+            flex-wrap: wrap;
+        }
+        .btn-generate {
+            background: #0f172a;
+            width: 100%;
+            margin-top: 1rem;
+            padding: 10px 20px;
+            font-size: 0.85rem;
+            box-shadow: none;
+        }
+        .strategies-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-top: 1.2rem;
+            overflow-x: auto;
+        }
+        .strategy-card {
+            background: #ffffff;
+            border-radius: 24px;
+            border: 1px solid #eef2ff;
+            overflow: hidden;
+            transition: 0.2s;
+            box-shadow: 0 5px 12px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+        }
+        .strategy-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 18px 28px -12px rgba(0, 0, 0, 0.12);
+        }
+        .card-header {
+            padding: 1rem 1.2rem;
+            font-weight: 800;
+            font-size: 1.2rem;
+            background: #f8fafc;
+            border-bottom: 2px solid;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-header.a {
+            border-bottom-color: #3b82f6;
+            background: #eff6ff;
+            color: #1e40af;
+        }
+        .card-header.b {
+            border-bottom-color: #10b981;
+            background: #ecfdf5;
+            color: #065f46;
+        }
+        .card-header.c {
+            border-bottom-color: #f97316;
+            background: #fff7ed;
+            color: #9a3412;
+        }
+        .card-body {
+            padding: 1rem 1.2rem 1.2rem;
+            flex: 1;
+        }
+        .card-body p {
+            margin: 0.6rem 0;
+            font-size: 0.85rem;
+            line-height: 1.45;
+        }
+        .card-body strong {
+            color: #0f172a;
+            font-weight: 700;
+            display: inline-block;
+            min-width: 90px;
+        }
+        .keyword-badge {
+            background: #e0e7ff;
+            color: #1e40af;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+            display: inline-block;
+        }
+        .sku-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 5px;
+        }
+        .sku-option {
+            background: #f1f5f9;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.75rem;
+        }
+        .image-item, .detail-item {
+            background: #f8fafc;
+            border-radius: 14px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+        }
+        .image-item .pos, .detail-item .pos {
+            font-weight: 700;
+            color: #4f46e5;
+            font-size: 0.7rem;
+        }
+        .prompt-text {
+            font-family: monospace;
+            font-size: 0.7rem;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 10px;
+            margin-top: 5px;
+            word-break: break-word;
+            border-left: 3px solid #4f46e5;
+        }
+        .card-actions {
+            padding: 0 1.2rem 1.2rem 1.2rem;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            border-top: 1px solid #eef2ff;
+            margin-top: 8px;
+            padding-top: 1rem;
+        }
+        .card-actions button {
+            flex: 1;
+            background: #f1f5f9;
+            color: #1e293b;
+            font-size: 0.75rem;
+            padding: 8px 12px;
+            box-shadow: none;
+        }
+        .card-actions button:hover {
+            background: #e2e8f0;
+            transform: none;
+        }
+        .generated-images {
+            margin-top: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: flex-start;
+            background: #fafcff;
+            border-radius: 20px;
+            padding: 12px;
+        }
+        .generated-images .image-card {
+            width: calc(50% - 8px);
+            min-width: 200px;
+            background: white;
+            border-radius: 20px;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+            transition: transform 0.1s;
+        }
+        .generated-images .image-card:hover {
+            transform: scale(1.02);
+        }
+        .generated-images .image-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+            cursor: pointer;
+            background: #f8fafc;
+        }
+        .generated-images .image-card .img-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 8px;
+            background: #ffffff;
+            color: #1e293b;
+            border-top: 1px solid #e2e8f0;
+        }
+        .image-loading {
+            font-size: 0.85rem;
+            color: #4f46e5;
+            text-align: center;
+            padding: 20px;
+            background: #f1f5f9;
+            border-radius: 20px;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 20px;
+            margin: 1rem 0;
+            border-left: 5px solid #ef4444;
+        }
+        .info-note {
+            font-size: 0.8rem;
+            color: #4b5563;
+            background: #f9fafb;
+            border-radius: 16px;
+            padding: 12px;
+            text-align: center;
+            margin-top: 1rem;
+        }
+        @media (max-width: 1000px) {
+            .strategies-grid {
+                min-width: 900px;
+            }
+            .output-panel {
+                overflow-x: auto;
+            }
+            .generated-images .image-card {
+                width: 100%;
+                max-width: 400px;
+                margin: 0 auto;
+            }
+        }
+        @media (min-width: 1400px) {
+            .generated-images .image-card {
+                width: calc(33% - 12px);
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="hero">
+        <h1>电商产品分析助手</h1>
+        <p>多模态识别 · 痛点挖掘 · AI营销策略生成 · AI电商主图/详情图生成</p>
+    </div>
+    <div class="dashboard">
+        <div class="input-panel">
+            <form id="analysisForm" enctype="multipart/form-data">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>📦 产品名称 *</label>
+                        <input type="text" id="name" placeholder="例：超薄磁吸充电宝" required>
+                    </div>
+                    <div class="form-group">
+                        <label>⚙️ 核心功能 *</label>
+                        <input type="text" id="function" placeholder="例：10000mAh, 20W快充, 磁吸无线充" required>
+                    </div>
+                    <div class="form-group">
+                        <label>💰 价格 *</label>
+                        <input type="text" id="price" placeholder="例：129元 / $19.9" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>📝 补充信息 (材质/规格/颜色)</label>
+                    <textarea id="extra" rows="2" placeholder="例：深空灰，亲肤硅胶材质，自带折叠支架"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>🖼️ 产品白底图 (视觉分析+生图参考) *</label>
+                    <div class="file-zone" id="fileZone">
+                        <input type="file" id="image" accept="image/jpeg,image/jpg,image/png,image/webp" style="display:none;">
+                        <button type="button" id="uploadBtn" style="background:#eef2ff; color:#1e293b; box-shadow:none; margin-bottom:8px;">📁 点击上传图片</button>
+                        <div style="font-size:12px; color:#6c757d;">支持 JPG/PNG/WebP，白底图效果最佳</div>
+                        <img id="preview" class="image-preview" alt="预览图">
+                    </div>
+                </div>
+                <button type="submit" id="submitBtn">🔍 开始多模态分析</button>
+                <div class="loading" id="loadingAnalyze">⏳ 豆包视觉模型分析中，结合图文提炼卖点...</div>
+            </form>
+        </div>
+
+        <div class="output-panel">
+            <div id="analysisResultArea">
+                <div style="text-align: center; color: #94a3b8; padding: 2rem 0.5rem;">
+                    ✨ 上传产品图片并填写信息，AI 将生成专业分析报告<br>
+                    之后可一键生成三套差异化营销方案，并基于方案生成真实电商主图/详情图
+                </div>
+            </div>
+            <div id="dynamicStrategyRoot"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ---------- 配置 ----------
+    const API_BASE = 'http://localhost:8000';
+    const ANALYZE_URL = `${API_BASE}/analyze`;
+    const STRATEGY_URL = `${API_BASE}/generate_strategies`;
+    const MAIN_IMAGES_URL = `${API_BASE}/generate_main_images`;
+    const DETAIL_IMAGES_URL = `${API_BASE}/generate_detail_images`;
+    const TASK_RESULT_URL = `${API_BASE}/task/result`;   // 统一结果查询接口
+
+    // DOM 元素
+    const form = document.getElementById('analysisForm');
+    const nameInput = document.getElementById('name');
+    const functionInput = document.getElementById('function');
+    const priceInput = document.getElementById('price');
+    const extraInput = document.getElementById('extra');
+    const imageFileInput = document.getElementById('image');
+    const previewImg = document.getElementById('preview');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const loadingAnalyze = document.getElementById('loadingAnalyze');
+    const submitBtn = document.getElementById('submitBtn');
+    const analysisResultArea = document.getElementById('analysisResultArea');
+    const dynamicStrategyRoot = document.getElementById('dynamicStrategyRoot');
+
+    // 全局存储
+    let currentAnalysisMarkdown = null;
+    let currentProductImageFile = null;
+    let currentStrategies = null;
+
+    if (typeof marked !== 'undefined') {
+        marked.setOptions({ breaks: true, gfm: true, headerIds: false, mangle: false });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
+    }
+
+    // 通用轮询函数
+    async function pollTask(resultUrl, taskId, onSuccess, onError) {
+        const maxAttempts = 120;
+        let attempts = 0;
+        const poll = async () => {
+            attempts++;
+            try {
+                const response = await fetch(`${resultUrl}/${taskId}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                if (data.status === 'SUCCESS') {
+                    onSuccess(data.result);
+                    return;
+                } else if (data.status === 'FAILURE') {
+                    onError(data.error || '任务执行失败');
+                    return;
+                } else {
+                    if (attempts >= maxAttempts) {
+                        onError('任务超时，请稍后重试');
+                        return;
+                    }
+                    setTimeout(poll, 2000);
+                }
+            } catch (err) {
+                if (attempts >= maxAttempts) {
+                    onError(`轮询失败: ${err.message}`);
+                    return;
+                }
+                setTimeout(poll, 2000);
+            }
+        };
+        poll();
+    }
+
+    async function renderAnalysisReport(markdownText, taskId, usedMultimodal = true) {
+        if (!markdownText) {
+            analysisResultArea.innerHTML = `<div class="error">分析报告为空</div>`;
+            return;
+        }
+        try {
+            const htmlContent = await marked.parse(markdownText);
+            analysisResultArea.innerHTML = `
+                <div class="analysis-card">
+                    <h2>📋 产品深度分析报告</h2>
+                    <div class="markdown-body">${htmlContent}</div>
+                    <div class="task-id">🆔 任务ID: ${taskId} | ${usedMultimodal ? '🔍 多模态视觉分析' : '分析完成'}</div>
+                </div>
+            `;
+        } catch (err) {
+            analysisResultArea.innerHTML = `<div class="error">报告解析失败<br><pre>${markdownText.substring(0, 500)}</pre></div>`;
+        }
+    }
+
+    async function generateImages(apiUrl, resultUrl, formData, cardElement, type) {
+        const containerClass = type === 'main' ? '.main-images-container' : '.detail-images-container';
+        const imagesContainer = cardElement.querySelector(containerClass);
+        if (!imagesContainer) return;
+
+        imagesContainer.innerHTML = `<div class="image-loading">⏳ 正在提交图片生成任务...</div>`;
+
+        try {
+            const response = await fetch(apiUrl, { method: 'POST', body: formData });
+            if (!response.ok) {
+                let errMsg = `HTTP ${response.status}`;
+                try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch(e) {}
+                throw new Error(errMsg);
+            }
+            const { task_id } = await response.json();
+            imagesContainer.innerHTML = `<div class="image-loading">⏳ 图片生成中（约5-15秒），请稍候...</div>`;
+
+            pollTask(resultUrl, task_id,
+                (result) => {
+                    const images = result.images || [];
+                    if (images.length === 0) {
+                        imagesContainer.innerHTML = `<div class="error">未返回图片</div>`;
+                        return;
+                    }
+                    let html = '<div class="generated-images">';
+                    for (let img of images) {
+                        html += `
+                            <div class="image-card">
+                                <img src="${escapeHtml(img.url)}" alt="图片${img.position}" 
+                                     onclick="window.open('${escapeHtml(img.url)}', '_blank')"
+                                     onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\' viewBox=\'0 0 400 400\'%3E%3Crect width=\'400\' height=\'400\' fill=\'%23fee2e2\'/%3E%3Ctext x=\'200\' y=\'210\' text-anchor=\'middle\' fill=\'%23991b1b\' font-size=\'16\'%3E加载失败%3C/text%3E%3C/svg%3E';">
+                                <div class="img-label">第${img.position}张</div>
+                            </div>
+                        `;
+                    }
+                    html += '</div>';
+                    imagesContainer.innerHTML = html;
+                },
+                (error) => {
+                    imagesContainer.innerHTML = `<div class="error">生成失败：${error}</div>`;
+                }
+            );
+        } catch (err) {
+            imagesContainer.innerHTML = `<div class="error">生成失败：${err.message}</div>`;
+        }
+    }
+
+    function renderStrategyCard(key, strategy) {
+        const titles = { A: '方案A · 痛点解决型', B: '方案B · 效率功能型', C: '方案C · 情绪品质型' };
+        const borderColor = { A: '#3b82f6', B: '#10b981', C: '#f97316' };
+        const headerClass = key === 'A' ? 'a' : (key === 'B' ? 'b' : 'c');
+
+        let mainImagesHtml = '';
+        if (strategy.main_images && strategy.main_images.length) {
+            mainImagesHtml = '<div style="margin: 0.5rem 0;"><strong>🖼️ 主图设计（5张）</strong></div>';
+            strategy.main_images.forEach(img => {
+                mainImagesHtml += `
+                    <div class="image-item">
+                        <span class="pos">第${img.position}张 · ${escapeHtml(img.description)}</span>
+                        <div class="prompt-text">🎨 ${escapeHtml(img.prompt)}</div>
+                    </div>
+                `;
+            });
+        } else {
+            mainImagesHtml = '<div class="info-note" style="margin-top:0;">暂无主图规划</div>';
+        }
+
+        let detailPagesHtml = '';
+        if (strategy.detail_pages && strategy.detail_pages.length) {
+            detailPagesHtml = '<div style="margin: 0.5rem 0;"><strong>📄 详情页模块（5屏）</strong></div>';
+            strategy.detail_pages.forEach(detail => {
+                detailPagesHtml += `
+                    <div class="detail-item">
+                        <span class="pos">模块${detail.position} · ${escapeHtml(detail.section_title)}</span>
+                        <div>📝 ${escapeHtml(detail.description)}</div>
+                        <div class="prompt-text">🎨 ${escapeHtml(detail.prompt)}</div>
+                    </div>
+                `;
+            });
+        } else {
+            detailPagesHtml = '<div class="info-note" style="margin-top:0;">暂无详情规划</div>';
+        }
+
+        let skuHtml = '';
+        if (strategy.sku_info) {
+            const opts = strategy.sku_info.options || [];
+            skuHtml = `
+                <div><strong>🏷️ SKU规格</strong></div>
+                <div class="sku-options">${opts.map(opt => `<span class="sku-option">${escapeHtml(opt)}</span>`).join('')}</div>
+                ${strategy.sku_info.price_range ? `<div>💰 价格区间: ${escapeHtml(strategy.sku_info.price_range)}</div>` : ''}
+                ${strategy.sku_info.additional_note ? `<div>📌 ${escapeHtml(strategy.sku_info.additional_note)}</div>` : ''}
+            `;
+        } else {
+            skuHtml = '<div>暂无SKU信息</div>';
+        }
+
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'strategy-card';
+        cardDiv.setAttribute('data-strategy-key', key);
+        cardDiv.innerHTML = `
+            <div class="card-header ${headerClass}" style="border-bottom-color: ${borderColor[key]};">
+                <span>${titles[key]}</span>
+            </div>
+            <div class="card-body">
+                <p><strong>🎯 目标用户</strong><br>${escapeHtml(strategy.target_user || '—')}</p>
+                <p><strong>💡 核心卖点</strong><br>${escapeHtml(strategy.core_selling_point || '—')}</p>
+                <p><strong>🔑 长尾关键词</strong><br><span class="keyword-badge">${escapeHtml(strategy.long_tail_keywords || '—')}</span></p>
+                ${mainImagesHtml}
+                ${detailPagesHtml}
+                ${skuHtml}
+            </div>
+            <div class="card-actions">
+                <button class="gen-main-btn">🎨 生成5张主图（1:1）</button>
+                <button class="gen-detail-btn">🖼️ 生成5张详情图（16:9）</button>
+            </div>
+            <div class="main-images-container" style="padding: 0 1.2rem 1rem 1.2rem;"></div>
+            <div class="detail-images-container" style="padding: 0 1.2rem 1.2rem 1.2rem;"></div>
+        `;
+        return cardDiv;
+    }
+
+    function renderStrategiesWithActions(strategies, taskId) {
+        if (!dynamicStrategyRoot) return;
+        const container = document.createElement('div');
+        container.className = 'strategies-grid';
+        const keys = ['A', 'B', 'C'];
+        for (let key of keys) {
+            if (strategies[key]) {
+                const card = renderStrategyCard(key, strategies[key]);
+                container.appendChild(card);
+            }
+        }
+        dynamicStrategyRoot.innerHTML = `
+            <div style="margin-top: 20px;">
+                <div class="strategy-header">
+                    <span style="font-weight:700; background:#f1f5f9; padding:6px 12px; border-radius:30px;">🚀 营销方案工厂</span>
+                </div>
+                <div id="strategiesGridContainer"></div>
+                <div class="info-note">✨ 策略基于分析报告生成，点击下方按钮可调用 Seedream 4.5 生成真实电商主图/详情图</div>
+            </div>
+        `;
+        const gridContainer = document.getElementById('strategiesGridContainer');
+        gridContainer.appendChild(container);
+
+        const cards = document.querySelectorAll('.strategy-card');
+        cards.forEach(card => {
+            const key = card.getAttribute('data-strategy-key');
+            const strategy = strategies[key];
+            if (!strategy) return;
+
+            const mainBtn = card.querySelector('.gen-main-btn');
+            const detailBtn = card.querySelector('.gen-detail-btn');
+
+            mainBtn.addEventListener('click', async () => {
+                if (!currentProductImageFile) {
+                    alert('请先在产品表单中上传产品白底图');
+                    return;
+                }
+                mainBtn.disabled = true;
+                mainBtn.innerHTML = '⏳ 提交中...';
+                const formData = new FormData();
+                formData.append('product_image', currentProductImageFile);
+                formData.append('main_images_data', JSON.stringify(strategy.main_images));
+                await generateImages(MAIN_IMAGES_URL, TASK_RESULT_URL, formData, card, 'main');
+                mainBtn.disabled = false;
+                mainBtn.innerHTML = '🎨 生成5张主图（1:1）';
+            });
+
+            detailBtn.addEventListener('click', async () => {
+                if (!currentProductImageFile) {
+                    alert('请先在产品表单中上传产品白底图');
+                    return;
+                }
+                detailBtn.disabled = true;
+                detailBtn.innerHTML = '⏳ 提交中...';
+                const formData = new FormData();
+                formData.append('product_image', currentProductImageFile);
+                formData.append('detail_pages_data', JSON.stringify(strategy.detail_pages));
+                await generateImages(DETAIL_IMAGES_URL, TASK_RESULT_URL, formData, card, 'detail');
+                detailBtn.disabled = false;
+                detailBtn.innerHTML = '🖼️ 生成5张详情图（16:9）';
+            });
+        });
+    }
+
+    function resetStrategyArea() {
+        if (!dynamicStrategyRoot) return;
+        dynamicStrategyRoot.innerHTML = `
+            <div style="margin-top: 20px;" id="strategyControl">
+                <div class="strategy-header">
+                    <span style="font-weight:700; background:#f1f5f9; padding:6px 12px; border-radius:30px;">🚀 营销方案工厂</span>
+                    <button id="generateStrategiesBtn" class="btn-generate">✨ 生成3套差异化营销方案</button>
+                </div>
+                <div id="strategiesContainer" style="margin-top: 15px;">
+                    <div class="info-note">💡 点击上方按钮，基于分析报告调用 DeepSeek-V3.2 生成三种策略 (痛点/效率/情绪)</div>
+                </div>
+            </div>
+        `;
+        const genBtn = document.getElementById('generateStrategiesBtn');
+        if (genBtn) genBtn.addEventListener('click', callGenerateStrategies);
+    }
+
+    async function callGenerateStrategies() {
+        if (!currentAnalysisMarkdown || currentAnalysisMarkdown.trim() === '') {
+            const container = document.getElementById('strategiesContainer');
+            if (container) container.innerHTML = `<div class="error">❌ 未检测到分析报告，请先完成产品分析。</div>`;
+            return;
+        }
+        const genBtn = document.getElementById('generateStrategiesBtn');
+        const strategiesContainer = document.getElementById('strategiesContainer');
+        if (!strategiesContainer) return;
+        const originalText = genBtn?.innerHTML || '生成方案';
+        if (genBtn) { genBtn.disabled = true; genBtn.innerHTML = '⏳ 提交中...'; }
+        strategiesContainer.innerHTML = `<div class="loading" style="display:block;">🤖 DeepSeek 正在为您定制三套完整电商方案...</div>`;
+
+        try {
+            const formData = new FormData();
+            formData.append('analysis', currentAnalysisMarkdown);
+            const response = await fetch(STRATEGY_URL, { method: 'POST', body: formData });
+            if (!response.ok) {
+                let errMsg = `HTTP ${response.status}`;
+                try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch(e) {}
+                throw new Error(errMsg);
+            }
+            const { task_id } = await response.json();
+            strategiesContainer.innerHTML = `<div class="loading" style="display:block;">⏳ 策略生成中（约10-20秒）...</div>`;
+            // 轮询策略结果 - 使用统一的结果查询接口
+            pollTask(TASK_RESULT_URL, task_id,
+                (result) => {
+                    if (!result.strategies) {
+                        strategiesContainer.innerHTML = `<div class="error">返回数据缺少strategies字段</div>`;
+                        return;
+                    }
+                    currentStrategies = result.strategies;
+                    renderStrategiesWithActions(currentStrategies, task_id);
+                },
+                (error) => {
+                    strategiesContainer.innerHTML = `<div class="error">❌ 生成失败：${error}</div>`;
+                }
+            );
+        } catch (err) {
+            strategiesContainer.innerHTML = `<div class="error">❌ 生成失败：${err.message}</div>`;
+        } finally {
+            if (genBtn) { genBtn.disabled = false; genBtn.innerHTML = originalText; }
+        }
+    }
+
+    function setupImageUpload() {
+        uploadBtn.addEventListener('click', () => imageFileInput.click());
+        imageFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                currentProductImageFile = file;
+                const reader = new FileReader();
+                reader.onload = (ev) => { previewImg.src = ev.target.result; previewImg.style.display = 'block'; };
+                reader.readAsDataURL(file);
+            } else {
+                currentProductImageFile = null;
+                previewImg.style.display = 'none';
+                previewImg.src = '';
+            }
+        });
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = nameInput.value.trim();
+        const funcVal = functionInput.value.trim();
+        const price = priceInput.value.trim();
+        const extra = extraInput.value.trim();
+        const imageFile = imageFileInput.files[0];
+        if (!name || !funcVal || !price) { alert('请填写产品名称、功能和价格'); return; }
+        if (!imageFile) { alert('请上传产品白底图'); return; }
+        currentProductImageFile = imageFile;
+        currentAnalysisMarkdown = null;
+        currentStrategies = null;
+        resetStrategyArea();
+        loadingAnalyze.style.display = 'block';
+        submitBtn.disabled = true;
+        analysisResultArea.innerHTML = `<div class="analysis-card"><div class="loading" style="display:block;">🔍 提交分析任务...</div></div>`;
+
+        try {
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('function', funcVal);
+            formData.append('price', price);
+            formData.append('extra', extra);
+            formData.append('image', imageFile);
+            const response = await fetch(ANALYZE_URL, { method: 'POST', body: formData });
+            if (!response.ok) {
+                let errMsg = `请求失败 ${response.status}`;
+                try { const errJson = await response.json(); errMsg = errJson.detail || errMsg; } catch(e) {}
+                throw new Error(errMsg);
+            }
+            const { task_id } = await response.json();
+            analysisResultArea.innerHTML = `<div class="analysis-card"><div class="loading" style="display:block;">⏳ 分析任务已提交，等待结果（约5-10秒）...</div></div>`;
+            // 轮询分析结果 - 使用统一的结果查询接口
+            pollTask(TASK_RESULT_URL, task_id,
+                (result) => {
+                    if (!result.analysis) {
+                        analysisResultArea.innerHTML = `<div class="error">分析报告为空</div>`;
+                        return;
+                    }
+                    currentAnalysisMarkdown = result.analysis;
+                    renderAnalysisReport(result.analysis, task_id, result.used_multimodal);
+                    const container = document.getElementById('strategiesContainer');
+                    if (container) container.innerHTML = `<div class="info-note">✅ 分析完成！点击上方按钮生成营销方案。</div>`;
+                },
+                (error) => {
+                    analysisResultArea.innerHTML = `<div class="error">分析失败：${error}</div>`;
+                    if (dynamicStrategyRoot) dynamicStrategyRoot.innerHTML = `<div class="info-note" style="color:#b91c1c;">⚠️ 分析失败，无法生成策略</div>`;
+                }
+            );
+        } catch (err) {
+            let errorMsg = err.message;
+            if (err.message.includes('Failed to fetch')) errorMsg = '无法连接后端服务，请确认后端已启动在 http://localhost:8000';
+            else if (err.message.includes('502')) errorMsg = '豆包API调用失败，请检查API Key';
+            analysisResultArea.innerHTML = `<div class="error"><strong>❌ 分析失败</strong><br>${escapeHtml(errorMsg)}</div>`;
+            if (dynamicStrategyRoot) dynamicStrategyRoot.innerHTML = `<div class="info-note" style="color:#b91c1c;">⚠️ 分析失败，无法生成策略</div>`;
+        } finally {
+            loadingAnalyze.style.display = 'none';
+            submitBtn.disabled = false;
+        }
+    });
+
+    setupImageUpload();
+    resetStrategyArea();
+    const initContainer = document.getElementById('strategiesContainer');
+    if (initContainer && !currentAnalysisMarkdown) {
+        initContainer.innerHTML = `<div class="info-note">📌 先完成产品分析，即可生成A/B/C三套完整电商视觉方案，并生成真实图片。</div>`;
+    }
+</script>
+</body>
+</html>
