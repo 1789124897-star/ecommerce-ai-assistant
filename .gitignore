@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyd
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# IDEs and other tools
+.vscode/ # VS Code settings and launch configurations (optional, you might want to share some)
+.idea/ # IntelliJ IDEA
+.history/ # VS Code Local History
+
+# Environments
+.env
+venv/
+env/
+*.sqlite3 # SQLite database files if used
+
+# Logs and databases
+*.log
+*.log.*
+data/ # If you have a data directory that stores generated or temporary data
+
+# Uploaded files
+media/ # If user uploaded media is stored here
+
+# Docker
+*.dockerignore
+docker-compose.override.yml # Local overrides
+.docker/ # Docker related local files if any
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Celery related
+celerybeat.pid
+celeryworker.pid
+.celery/
+
+# Test reports
+.coverage
+htmlcov/
+.nox/
