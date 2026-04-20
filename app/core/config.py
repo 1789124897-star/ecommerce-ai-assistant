@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     SEEDREAM_IMAGE_MODEL: str
 
     REDIS_URL: str
-    DATABASE_URL: str = "mysql+aiomysql://user:pass@db:3306/ecommerce"
+    DATABASE_URL: str = "mysql+aiomysql://root:root@localhost:3306/ecommerce_ai_db"
 
     MAX_RAW_IMAGE_BYTES: int = 8 * 1024 * 1024
     MAX_CONCURRENT_IMAGE_GEN: int = 3
