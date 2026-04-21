@@ -11,7 +11,6 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.routes import auth, health
-from app.api.deps import db_session
 from app.api.routes.analysis import limiter
 
 from app.api.routes.analysis import router as analysis_router

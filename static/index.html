@@ -414,6 +414,14 @@
         <p>多模态识别 · 痛点挖掘 · AI营销策略生成 · AI电商主图/详情图生成</p>
     </div>
     <div class="dashboard">
+        <div class="input-panel" style="border-bottom:1px solid #e9eef3; background:#f8fafc;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <span style="font-weight:600; color:#1e293b; white-space:nowrap;">🔍 任务查询：</span>
+                <input type="text" id="taskQueryInput" placeholder="输入任务ID查询历史结果" style="flex:1; min-width:200px; margin:0; background:white;">
+                <button type="button" id="taskQueryBtn" style="width:auto; margin:0; padding:8px 16px; font-size:0.85rem;">查询结果</button>
+            </div>
+            <div id="taskQueryResult" style="margin-top:10px;"></div>
+        </div>
         <div class="input-panel">
             <form id="analysisForm" enctype="multipart/form-data">
                 <div class="form-row">
@@ -462,12 +470,14 @@
 
 <script>
     // ---------- 配置 ----------
-    const API_BASE = 'http://localhost:8000';
-    const ANALYZE_URL = `${API_BASE}/analyze`;
-    const STRATEGY_URL = `${API_BASE}/generate_strategies`;
-    const MAIN_IMAGES_URL = `${API_BASE}/generate_main_images`;
-    const DETAIL_IMAGES_URL = `${API_BASE}/generate_detail_images`;
-    const TASK_RESULT_URL = `${API_BASE}/task/result`;   // 统一结果查询接口
+    // 默认静态页由后端同域提供（/static），因此用同源请求即可；如需跨域再改成完整 URL。
+    const API_BASE = '';
+    const API_PREFIX = `${API_BASE}/api/v1`;
+    const ANALYZE_URL = `${API_PREFIX}/analysis/submit`;
+    const STRATEGY_URL = `${API_PREFIX}/analysis/strategies`;
+    const MAIN_IMAGES_URL = `${API_PREFIX}/analysis/images/main`;
+    const DETAIL_IMAGES_URL = `${API_PREFIX}/analysis/images/detail`;
+    const TASK_RESULT_URL = `${API_PREFIX}/tasks`;   // 统一结果查询接口：GET /tasks/{task_id}
 
     // DOM 元素
     const form = document.getElementById('analysisForm');
@@ -497,7 +507,7 @@
         return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : (m === '<' ? '&lt;' : '&gt;'));
     }
 
-    // 通用轮询函数
+    // 通用轮询函数（适配后端 success_response 包装）
     async function pollTask(resultUrl, taskId, onSuccess, onError) {
         const maxAttempts = 120;
         let attempts = 0;
@@ -508,12 +518,16 @@
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
-                const data = await response.json();
+                const payload = await response.json();
+                const data = payload?.data;
+                if (!data || typeof data !== 'object') {
+                    throw new Error('Invalid response payload');
+                }
                 if (data.status === 'SUCCESS') {
                     onSuccess(data.result);
                     return;
                 } else if (data.status === 'FAILURE') {
-                    onError(data.error || '任务执行失败');
+                    onError(data.error_message || '任务执行失败');
                     return;
                 } else {
                     if (attempts >= maxAttempts) {
@@ -563,39 +577,67 @@
             const response = await fetch(apiUrl, { method: 'POST', body: formData });
             if (!response.ok) {
                 let errMsg = `HTTP ${response.status}`;
-                try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch(e) {}
+                try {
+                    const errData = await response.json();
+                    errMsg = errData?.message || errData?.detail || errMsg;
+                } catch(e) {}
                 throw new Error(errMsg);
             }
-            const { task_id } = await response.json();
-            imagesContainer.innerHTML = `<div class="image-loading">⏳ 图片生成中（约5-15秒），请稍候...</div>`;
+            const payload = await response.json();
+            const task_id = payload?.data?.task_id;
+            if (!task_id) throw new Error('后端未返回 task_id');
+            imagesContainer.innerHTML = `
+                <div class="image-loading">⏳ 图片生成中（约5-15秒），请稍候...</div>
+                <div class="task-id" style="text-align:left; margin-top:8px; border-top:none; padding-top:0; font-size:0.7rem;">
+                    🆔 任务ID: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-family:monospace;">${task_id}</code>
+                </div>
+            `;
 
-            pollTask(resultUrl, task_id,
-                (result) => {
-                    const images = result.images || [];
-                    if (images.length === 0) {
-                        imagesContainer.innerHTML = `<div class="error">未返回图片</div>`;
-                        return;
+            return new Promise((resolve, reject) => {
+                pollTask(resultUrl, task_id,
+                    (result) => {
+                        const images = result.images || [];
+                        if (images.length === 0) {
+                            imagesContainer.innerHTML = `<div class="error">未返回图片</div>`;
+                            reject(new Error('未返回图片'));
+                            return;
+                        }
+                        let html = '<div class="generated-images">';
+                        for (let img of images) {
+                            if (img.error) {
+                                html += `
+                                    <div class="image-card">
+                                        <div style="padding:20px; background:#fee2e2; color:#991b1b; font-size:0.8rem; text-align:center;">
+                                            ❌ 第${img.position}张生成失败<br>
+                                            <span style="font-size:0.7rem;">${escapeHtml(img.error)}</span>
+                                        </div>
+                                        <div class="img-label">第${img.position}张 · 失败</div>
+                                    </div>
+                                `;
+                            } else {
+                                html += `
+                                    <div class="image-card">
+                                        <img src="${escapeHtml(img.url)}" alt="图片${img.position}"
+                                             onclick="window.open('${escapeHtml(img.url)}', '_blank')"
+                                             onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\' viewBox=\'0 0 400 400\'%3E%3Crect width=\'400\' height=\'400\' fill=\'%23fee2e2\'/%3E%3Ctext x=\'200\' y=\'210\' text-anchor=\'middle\' fill=\'%23991b1b\' font-size=\'16\'%3E加载失败%3C/text%3E%3C/svg%3E';">
+                                        <div class="img-label">第${img.position}张</div>
+                                    </div>
+                                `;
+                            }
+                        }
+                        html += '</div>';
+                        imagesContainer.innerHTML = html;
+                        resolve(result);
+                    },
+                    (error) => {
+                        imagesContainer.innerHTML = `<div class="error">生成失败：${error}</div>`;
+                        reject(new Error(error));
                     }
-                    let html = '<div class="generated-images">';
-                    for (let img of images) {
-                        html += `
-                            <div class="image-card">
-                                <img src="${escapeHtml(img.url)}" alt="图片${img.position}" 
-                                     onclick="window.open('${escapeHtml(img.url)}', '_blank')"
-                                     onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\' viewBox=\'0 0 400 400\'%3E%3Crect width=\'400\' height=\'400\' fill=\'%23fee2e2\'/%3E%3Ctext x=\'200\' y=\'210\' text-anchor=\'middle\' fill=\'%23991b1b\' font-size=\'16\'%3E加载失败%3C/text%3E%3C/svg%3E';">
-                                <div class="img-label">第${img.position}张</div>
-                            </div>
-                        `;
-                    }
-                    html += '</div>';
-                    imagesContainer.innerHTML = html;
-                },
-                (error) => {
-                    imagesContainer.innerHTML = `<div class="error">生成失败：${error}</div>`;
-                }
-            );
+                );
+            });
         } catch (err) {
             imagesContainer.innerHTML = `<div class="error">生成失败：${err.message}</div>`;
+            throw err;
         }
     }
 
@@ -665,7 +707,7 @@
             </div>
             <div class="card-actions">
                 <button class="gen-main-btn">🎨 生成5张主图（1:1）</button>
-                <button class="gen-detail-btn">🖼️ 生成5张详情图（16:9）</button>
+                <button class="gen-detail-btn">🖼️ 生成5张详情图（2:3）</button>
             </div>
             <div class="main-images-container" style="padding: 0 1.2rem 1rem 1.2rem;"></div>
             <div class="detail-images-container" style="padding: 0 1.2rem 1.2rem 1.2rem;"></div>
@@ -688,6 +730,7 @@
             <div style="margin-top: 20px;">
                 <div class="strategy-header">
                     <span style="font-weight:700; background:#f1f5f9; padding:6px 12px; border-radius:30px;">🚀 营销方案工厂</span>
+                    <button id="generateStrategiesBtn" class="btn-generate">✨ 重新生成3套差异化营销方案</button>
                 </div>
                 <div id="strategiesGridContainer"></div>
                 <div class="info-note">✨ 策略基于分析报告生成，点击下方按钮可调用 Seedream 4.5 生成真实电商主图/详情图</div>
@@ -695,6 +738,9 @@
         `;
         const gridContainer = document.getElementById('strategiesGridContainer');
         gridContainer.appendChild(container);
+
+        const newGenBtn = document.getElementById('generateStrategiesBtn');
+        if (newGenBtn) newGenBtn.addEventListener('click', callGenerateStrategies);
 
         const cards = document.querySelectorAll('.strategy-card');
         cards.forEach(card => {
@@ -712,12 +758,17 @@
                 }
                 mainBtn.disabled = true;
                 mainBtn.innerHTML = '⏳ 提交中...';
-                const formData = new FormData();
-                formData.append('product_image', currentProductImageFile);
-                formData.append('main_images_data', JSON.stringify(strategy.main_images));
-                await generateImages(MAIN_IMAGES_URL, TASK_RESULT_URL, formData, card, 'main');
-                mainBtn.disabled = false;
-                mainBtn.innerHTML = '🎨 生成5张主图（1:1）';
+                try {
+                    const formData = new FormData();
+                    formData.append('product_image', currentProductImageFile);
+                    formData.append('main_images_data', JSON.stringify(strategy.main_images));
+                    await generateImages(MAIN_IMAGES_URL, TASK_RESULT_URL, formData, card, 'main');
+                } catch (err) {
+                    // 错误已在 generateImages 内部显示
+                } finally {
+                    mainBtn.disabled = false;
+                    mainBtn.innerHTML = '🎨 生成5张主图（1:1）';
+                }
             });
 
             detailBtn.addEventListener('click', async () => {
@@ -727,12 +778,17 @@
                 }
                 detailBtn.disabled = true;
                 detailBtn.innerHTML = '⏳ 提交中...';
-                const formData = new FormData();
-                formData.append('product_image', currentProductImageFile);
-                formData.append('detail_pages_data', JSON.stringify(strategy.detail_pages));
-                await generateImages(DETAIL_IMAGES_URL, TASK_RESULT_URL, formData, card, 'detail');
-                detailBtn.disabled = false;
-                detailBtn.innerHTML = '🖼️ 生成5张详情图（16:9）';
+                try {
+                    const formData = new FormData();
+                    formData.append('product_image', currentProductImageFile);
+                    formData.append('detail_pages_data', JSON.stringify(strategy.detail_pages));
+                    await generateImages(DETAIL_IMAGES_URL, TASK_RESULT_URL, formData, card, 'detail');
+                } catch (err) {
+                    // 错误已在 generateImages 内部显示
+                } finally {
+                    detailBtn.disabled = false;
+                    detailBtn.innerHTML = '🖼️ 生成5张详情图（2:3）';
+                }
             });
         });
     }
@@ -764,7 +820,7 @@
         const strategiesContainer = document.getElementById('strategiesContainer');
         if (!strategiesContainer) return;
         const originalText = genBtn?.innerHTML || '生成方案';
-        if (genBtn) { genBtn.disabled = true; genBtn.innerHTML = '⏳ 提交中...'; }
+        if (genBtn) { genBtn.disabled = true; genBtn.innerHTML = '⏳ 生成中...'; }
         strategiesContainer.innerHTML = `<div class="loading" style="display:block;">🤖 DeepSeek 正在为您定制三套完整电商方案...</div>`;
 
         try {
@@ -773,16 +829,27 @@
             const response = await fetch(STRATEGY_URL, { method: 'POST', body: formData });
             if (!response.ok) {
                 let errMsg = `HTTP ${response.status}`;
-                try { const errData = await response.json(); errMsg = errData.detail || errMsg; } catch(e) {}
+                try {
+                    const errData = await response.json();
+                    errMsg = errData?.message || errData?.detail || errMsg;
+                } catch(e) {}
                 throw new Error(errMsg);
             }
-            const { task_id } = await response.json();
-            strategiesContainer.innerHTML = `<div class="loading" style="display:block;">⏳ 策略生成中（约10-20秒）...</div>`;
+            const payload = await response.json();
+            const task_id = payload?.data?.task_id;
+            if (!task_id) throw new Error('后端未返回 task_id');
+            strategiesContainer.innerHTML = `
+                <div class="loading" style="display:block;">⏳ 策略生成中（约10-20秒）...</div>
+                <div class="task-id" style="text-align:left; margin-top:8px; border-top:none; padding-top:0;">
+                    🆔 任务ID: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-family:monospace;">${task_id}</code>
+                </div>
+            `;
             // 轮询策略结果 - 使用统一的结果查询接口
             pollTask(TASK_RESULT_URL, task_id,
                 (result) => {
                     if (!result.strategies) {
                         strategiesContainer.innerHTML = `<div class="error">返回数据缺少strategies字段</div>`;
+                        if (genBtn) { genBtn.disabled = false; genBtn.innerHTML = originalText; }
                         return;
                     }
                     currentStrategies = result.strategies;
@@ -790,11 +857,11 @@
                 },
                 (error) => {
                     strategiesContainer.innerHTML = `<div class="error">❌ 生成失败：${error}</div>`;
+                    if (genBtn) { genBtn.disabled = false; genBtn.innerHTML = originalText; }
                 }
             );
         } catch (err) {
             strategiesContainer.innerHTML = `<div class="error">❌ 生成失败：${err.message}</div>`;
-        } finally {
             if (genBtn) { genBtn.disabled = false; genBtn.innerHTML = originalText; }
         }
     }
@@ -843,14 +910,29 @@
             const response = await fetch(ANALYZE_URL, { method: 'POST', body: formData });
             if (!response.ok) {
                 let errMsg = `请求失败 ${response.status}`;
-                try { const errJson = await response.json(); errMsg = errJson.detail || errMsg; } catch(e) {}
+                try {
+                    const errJson = await response.json();
+                    errMsg = errJson?.message || errJson?.detail || errMsg;
+                } catch(e) {}
                 throw new Error(errMsg);
             }
-            const { task_id } = await response.json();
-            analysisResultArea.innerHTML = `<div class="analysis-card"><div class="loading" style="display:block;">⏳ 分析任务已提交，等待结果（约5-10秒）...</div></div>`;
+            const payload = await response.json();
+            const task_id = payload?.data?.task_id;
+            if (!task_id) throw new Error('后端未返回 task_id');
+            analysisResultArea.innerHTML = `
+                <div class="analysis-card">
+                    <div class="loading" style="display:block;">⏳ 分析任务已提交，正在处理中（约5-10秒）...</div>
+                    <div class="task-id" style="text-align:left; margin-top:8px; border-top:none; padding-top:0;">
+                        🆔 任务ID: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-family:monospace;">${task_id}</code>
+                        <span style="color:#6b7280;">（可保存此ID，使用上方查询框随时查看结果）</span>
+                    </div>
+                </div>
+            `;
             // 轮询分析结果 - 使用统一的结果查询接口
             pollTask(TASK_RESULT_URL, task_id,
                 (result) => {
+                    loadingAnalyze.style.display = 'none';
+                    submitBtn.disabled = false;
                     if (!result.analysis) {
                         analysisResultArea.innerHTML = `<div class="error">分析报告为空</div>`;
                         return;
@@ -861,20 +943,120 @@
                     if (container) container.innerHTML = `<div class="info-note">✅ 分析完成！点击上方按钮生成营销方案。</div>`;
                 },
                 (error) => {
+                    loadingAnalyze.style.display = 'none';
+                    submitBtn.disabled = false;
                     analysisResultArea.innerHTML = `<div class="error">分析失败：${error}</div>`;
                     if (dynamicStrategyRoot) dynamicStrategyRoot.innerHTML = `<div class="info-note" style="color:#b91c1c;">⚠️ 分析失败，无法生成策略</div>`;
                 }
             );
         } catch (err) {
+            loadingAnalyze.style.display = 'none';
+            submitBtn.disabled = false;
             let errorMsg = err.message;
-            if (err.message.includes('Failed to fetch')) errorMsg = '无法连接后端服务，请确认后端已启动在 http://localhost:8000';
+            if (err.message.includes('Failed to fetch')) errorMsg = '无法连接后端服务，请确认后端已启动';
             else if (err.message.includes('502')) errorMsg = '豆包API调用失败，请检查API Key';
             analysisResultArea.innerHTML = `<div class="error"><strong>❌ 分析失败</strong><br>${escapeHtml(errorMsg)}</div>`;
             if (dynamicStrategyRoot) dynamicStrategyRoot.innerHTML = `<div class="info-note" style="color:#b91c1c;">⚠️ 分析失败，无法生成策略</div>`;
-        } finally {
-            loadingAnalyze.style.display = 'none';
-            submitBtn.disabled = false;
         }
+    });
+
+    async function handleTaskQuery() {
+        const input = document.getElementById('taskQueryInput');
+        const resultDiv = document.getElementById('taskQueryResult');
+        const taskId = input?.value?.trim();
+        if (!taskId) {
+            resultDiv.innerHTML = `<div class="error">请输入任务ID</div>`;
+            return;
+        }
+
+        resultDiv.innerHTML = `<div class="loading" style="display:block;">⏳ 正在查询任务状态...</div>`;
+        const queryBtn = document.getElementById('taskQueryBtn');
+        if (queryBtn) queryBtn.disabled = true;
+
+        try {
+            const response = await fetch(`${TASK_RESULT_URL}/${taskId}`);
+            if (!response.ok) {
+                if (response.status === 404) throw new Error('任务不存在，请检查任务ID是否正确');
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            const data = payload?.data;
+            if (!data || typeof data !== 'object') {
+                throw new Error('返回数据格式错误');
+            }
+
+            if (data.status === 'PENDING' || data.status === 'STARTED' || data.status === 'RETRY') {
+                resultDiv.innerHTML = `
+                    <div class="info-note">
+                        ⏳ 任务状态：<strong>${data.status}</strong><br>
+                        🆔 任务ID：${data.task_id}<br>
+                        📋 任务类型：${data.task_type}<br>
+                        任务正在处理中，请稍后再查询。
+                    </div>
+                `;
+            } else if (data.status === 'FAILURE') {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        ❌ 任务执行失败<br>
+                        🆔 任务ID：${data.task_id}<br>
+                        📋 任务类型：${data.task_type}<br>
+                        错误信息：${escapeHtml(data.error_message || '未知错误')}
+                    </div>
+                `;
+            } else if (data.status === 'SUCCESS') {
+                if (data.task_type === 'analysis') {
+                    if (data.result?.analysis) {
+                        currentAnalysisMarkdown = data.result.analysis;
+                        renderAnalysisReport(data.result.analysis, data.task_id, data.result.used_multimodal);
+                        resultDiv.innerHTML = `<div class="info-note">✅ 分析报告已加载到下方结果区域</div>`;
+                        const container = document.getElementById('strategiesContainer');
+                        if (container) container.innerHTML = `<div class="info-note">✅ 分析完成！点击上方按钮生成营销方案。</div>`;
+                    } else {
+                        resultDiv.innerHTML = `<div class="error">分析任务成功但结果为空</div>`;
+                    }
+                } else if (data.task_type === 'strategy') {
+                    if (data.result?.strategies) {
+                        currentStrategies = data.result.strategies;
+                        renderStrategiesWithActions(currentStrategies, data.task_id);
+                        resultDiv.innerHTML = `<div class="info-note">✅ 营销策略已加载到下方结果区域</div>`;
+                    } else {
+                        resultDiv.innerHTML = `<div class="error">策略任务成功但结果为空</div>`;
+                    }
+                } else if (data.task_type === 'main_image' || data.task_type === 'detail_image') {
+                    const images = data.result?.images || [];
+                    if (images.length > 0) {
+                        let html = '<div class="info-note">✅ 图片生成结果：</div><div class="generated-images">';
+                        for (let img of images) {
+                            html += `
+                                <div class="image-card">
+                                    <img src="${escapeHtml(img.url)}" alt="图片${img.position}"
+                                         onclick="window.open('${escapeHtml(img.url)}', '_blank')"
+                                         onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'400\' height=\'400\' viewBox=\'0 0 400 400\'%3E%3Crect width=\'400\' height=\'400\' fill=\'%23fee2e2\'/%3E%3Ctext x=\'200\' y=\'210\' text-anchor=\'middle\' fill=\'%23991b1b\' font-size=\'16\'%3E加载失败%3C/text%3E%3C/svg%3E';">
+                                    <div class="img-label">第${img.position}张</div>
+                                </div>
+                            `;
+                        }
+                        html += '</div>';
+                        resultDiv.innerHTML = html;
+                    } else {
+                        resultDiv.innerHTML = `<div class="error">图片任务成功但未返回图片</div>`;
+                    }
+                } else {
+                    resultDiv.innerHTML = `<div class="info-note">✅ 任务成功完成<br><pre>${escapeHtml(JSON.stringify(data.result, null, 2))}</pre></div>`;
+                }
+            } else {
+                resultDiv.innerHTML = `<div class="error">未知任务状态：${data.status}</div>`;
+            }
+        } catch (err) {
+            resultDiv.innerHTML = `<div class="error">查询失败：${escapeHtml(err.message)}</div>`;
+        } finally {
+            if (queryBtn) queryBtn.disabled = false;
+        }
+    }
+
+    document.getElementById('taskQueryBtn').addEventListener('click', handleTaskQuery);
+    document.getElementById('taskQueryInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleTaskQuery();
     });
 
     setupImageUpload();

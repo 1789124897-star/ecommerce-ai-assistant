@@ -1,4 +1,5 @@
 import asyncio
+import nest_asyncio
 import json
 from typing import Any
 
@@ -13,6 +14,7 @@ from app.repositories.tasks import TaskRepository
 from app.services.ai_client import AIClient
 from app.workers.celery_app import celery_app
 
+nest_asyncio.apply()
 
 logger = get_logger(__name__)
 
@@ -218,7 +220,7 @@ def generate_detail_images_task(
             product_image_mime=product_image_mime,
             specs_json=detail_pages_specs_json,
             image_type="detail",
-            default_size="1536x2304",
+            default_size="2048x2048",
         )
         run_async(_mark_success(self.request.id, result))
         return result

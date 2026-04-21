@@ -66,6 +66,9 @@ class TaskRepository:
         task.error_message = None
         task.finished_at = finished_at
         if task.started_at:
+            # Ensure task.started_at is timezone-aware
+            if task.started_at.tzinfo is None:
+                task.started_at = task.started_at.replace(tzinfo=timezone.utc)
             task.duration_ms = int((finished_at - task.started_at).total_seconds() * 1000)
         await self.db.commit()
 
@@ -78,6 +81,9 @@ class TaskRepository:
         task.error_message = error_message
         task.finished_at = finished_at
         if task.started_at:
+            # Ensure task.started_at is timezone-aware
+            if task.started_at.tzinfo is None:
+                task.started_at = task.started_at.replace(tzinfo=timezone.utc)
             task.duration_ms = int((finished_at - task.started_at).total_seconds() * 1000)
         await self.db.commit()
 
