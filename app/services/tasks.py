@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -34,3 +36,31 @@ class TaskQueryService:
         if task.status.value in {"SUCCESS", "FAILURE"}:
             await cache_json(cache_key, payload, settings.TASK_RESULT_CACHE_TTL)
         return payload
+
+    async def list_tasks(
+        self,
+        *,
+        status: Optional[str] = None,
+        task_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[dict]:
+        tasks = await self.repository.list_tasks(
+            status=status,
+            task_type=task_type,
+            limit=limit,
+        )
+        return [
+            {
+                "task_id": task.task_id,
+                "task_type": task.task_type,
+                "status": task.status.value,
+                "product_name": task.product_name,
+                "submitted_by": task.submitted_by,
+                "retry_count": task.retry_count,
+                "duration_ms": task.duration_ms,
+                "error_message": task.error_message,
+                "created_at": task.created_at.isoformat() if task.created_at else None,
+                "finished_at": task.finished_at.isoformat() if task.finished_at else None,
+            }
+            for task in tasks
+        ]

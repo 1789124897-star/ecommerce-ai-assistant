@@ -45,6 +45,40 @@ app/
 - 新版 API 前缀：`/api/v1`
 - 兼容旧版接口：保留 `/analyze`、`/generate_strategies`、`/task/result/{task_id}` 等入口，方便旧页面继续使用
 
+## 接口列表
+
+### 任务管理
+
+#### 查询任务列表
+
+```
+GET /api/v1/tasks
+```
+
+参数（Query）：
+
+| 参数 | 类型 | 必填 | 说明 |
+|-----|------|------|------|
+| status | string | 否 | 按状态筛选：`PENDING` / `STARTED` / `RETRY` / `SUCCESS` / `FAILURE` |
+| task_type | string | 否 | 按类型筛选：`analysis` / `strategy` / `main_image` / `detail_image` |
+| limit | int | 否 | 返回数量，默认 `20`，最大 `100` |
+
+返回：最近创建的任务列表（按 `created_at` 倒序），每条包含 `task_id`、`task_type`、`status`、`product_name`、`submitted_by`、`retry_count`、`duration_ms`、`error_message`、`created_at`、`finished_at`。
+
+示例：
+
+```bash
+curl "http://localhost:8000/api/v1/tasks?status=SUCCESS&task_type=analysis&limit=10"
+```
+
+#### 查询单个任务结果
+
+```
+GET /api/v1/tasks/{task_id}
+```
+
+返回：指定任务的完整结果，包括 `status`、`result`、`error_message` 等。
+
 ## 启动方式
 
 1. 配置 `.env`
