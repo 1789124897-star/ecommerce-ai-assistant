@@ -104,3 +104,19 @@ class TaskRepository:
                 )
             )
         await self.db.commit()
+
+    async def list_tasks(
+        self,
+        *,
+        status: Optional[str] = None,
+        task_type: Optional[str] = None,
+        limit: int = 20,
+    ) -> list[TaskRecord]:
+        stmt = select(TaskRecord).order_by(TaskRecord.created_at.desc())
+        if status:
+            stmt = stmt.where(TaskRecord.status == status)
+        if task_type:
+            stmt = stmt.where(TaskRecord.task_type == task_type)
+        stmt = stmt.limit(limit)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
