@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import GeneratedAsset, TaskRecord, TaskStatus
@@ -120,3 +120,39 @@ class TaskRepository:
         stmt = stmt.limit(limit)
         result = await self.db.execute(stmt)
         return result.scalars().all()
+
+    async def get_task_stats(self) -> dict:
+        # 各状态任务数量
+        status_stmt = select(TaskRecord.status, func.count(TaskRecord.id)).group_by(TaskRecord.status)
+        status_result = await self.db.execute(status_stmt)
+        status_counts = {row[0].value: row[1] for row in status_result.all()}
+
+        # 各任务类型数量
+        type_stmt = select(TaskRecord.task_type, func.count(TaskRecord.id)).group_by(TaskRecord.task_type)
+        type_result = await self.db.execute(type_stmt)
+        type_counts = {row[0]: row[1] for row in type_result.all()}
+
+        # 总任务数
+        total_result = await self.db.execute(select(func.count(TaskRecord.id)))
+        total = total_result.scalar() or 0
+
+        # 今日新增
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_result = await self.db.execute(
+            select(func.count(TaskRecord.id)).where(TaskRecord.created_at >= today)
+        )
+        today_count = today_result.scalar() or 0
+
+        # 平均耗时（仅统计已完成的）
+        avg_result = await self.db.execute(
+            select(func.avg(TaskRecord.duration_ms)).where(TaskRecord.duration_ms.isnot(None))
+        )
+        avg_duration = avg_result.scalar()
+
+        return {
+            "total": total,
+            "today": today_count,
+            "by_status": status_counts,
+            "by_task_type": type_counts,
+            "avg_duration_ms": int(avg_duration) if avg_duration else 0,
+        }
