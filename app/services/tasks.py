@@ -64,3 +64,7 @@ class TaskQueryService:
             }
             for task in tasks
         ]
+
+    async def get_task_stats(self) -> dict:
+        return await self.repository.get_task_stats()
+    
