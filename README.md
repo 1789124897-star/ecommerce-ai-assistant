@@ -43,7 +43,6 @@ app/
 ## API 入口
 
 - 新版 API 前缀：`/api/v1`
-- 兼容旧版接口：保留 `/analyze`、`/generate_strategies`、`/task/result/{task_id}` 等入口，方便旧页面继续使用
 
 ## 接口列表
 
