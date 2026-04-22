@@ -32,3 +32,12 @@ async def get_task_result(
 ) -> dict:
     result = await TaskQueryService(db).get_task_result(task_id)
     return success_response(data=result, message="task result fetched")
+
+@router.get("/stats")
+async def get_task_stats(
+    db: AsyncSession = Depends(db_session),
+    user: dict = Depends(get_current_user),
+) -> dict:
+    result = await TaskQueryService(db).get_task_stats()
+    return success_response(data=result, message="tasks list fetched")
+
